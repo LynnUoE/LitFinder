@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from github_tools import (BODY_CHARS, COMMENT_CHARS, MAX_COMMENTS, GetGithubIssue, GitHubClient, GitHubTools,
+from github_tools import (BODY_CHARS, COMMENT_CHARS, MAX_COMMENTS, GetGithubIssue, GitHubClient, GitHubError, GitHubTools,
                           SearchGithubIssues)
 from tools import MAX_LIMIT, ToolError
 
@@ -161,3 +161,49 @@ def test_client_sends_the_token_only_when_configured():
 def test_client_turns_failures_into_tool_errors(response, token, message):
     with pytest.raises(ToolError, match=message):
         make_client(response, token).get("/search/issues")
+
+
+# -- renamed repositories ----------------------------------------------------
+
+def test_search_retries_with_the_new_name_of_a_renamed_repository():
+    rejected = GitHubError("GitHub error (HTTP 422): Validation Failed", 422)
+    tools, github = make_tools({
+        "/search/issues": (rejected, {"total_count": 1, "items": [make_issue(7)]}),
+        "/repos/acme/widgets": {"full_name": "acme/gadgets"},  # The repos API followed the redirect
+    }, default_repo="acme/widgets")
+    result = tools.search_github_issues(search())
+    assert result["repo"] == "acme/gadgets" and result["total_matches"] == 1
+    assert [c["path"] for c in github.calls] == ["/search/issues", "/repos/acme/widgets", "/search/issues"]
+    assert github.calls[-1]["params"]["q"] == "repo:acme/gadgets is:issue is:open"
+
+
+def test_search_validation_errors_on_an_unrenamed_repository_are_reported():
+    rejected = GitHubError("GitHub error (HTTP 422): Validation Failed: bad query", 422)
+    tools, github = make_tools({"/search/issues": (rejected,), "/repos/acme/widgets": {"full_name": "Acme/Widgets"}})
+    with pytest.raises(ToolError, match="bad query"):
+        tools.search_github_issues(search())
+    assert len(github.calls) == 2
+
+
+def test_search_of_a_missing_repository_reports_not_found():
+    rejected = GitHubError("GitHub error (HTTP 422): Validation Failed", 422)
+    tools, _ = make_tools({"/search/issues": (rejected,)})
+    with pytest.raises(ToolError, match="Not found on GitHub"):
+        tools.search_github_issues(search())
+
+
+def test_get_issue_reports_the_current_name_of_a_renamed_repository():
+    tools, github = make_tools({
+        "/repos/acme/widgets/issues/7": make_issue(7, comments=1,
+                                                   repository_url="https://api.github.com/repos/acme/gadgets"),
+        "/repos/acme/gadgets/issues/7/comments": [],
+    })
+    assert tools.get_github_issue(get(7))["repo"] == "acme/gadgets"
+    assert github.calls[-1]["path"] == "/repos/acme/gadgets/issues/7/comments"
+
+
+def test_client_includes_github_validation_details():
+    body = {"message": "Validation Failed", "errors": [{"message": "The listed repositories cannot be searched"}]}
+    with pytest.raises(GitHubError, match="Validation Failed: The listed repositories cannot be searched") as e:
+        make_client(StubResponse(422, body)).get("/search/issues")
+    assert e.value.status == 422

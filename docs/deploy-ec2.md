@@ -108,7 +108,7 @@ ssh -i ~/.ssh/litfinder.pem ubuntu@YOUR_ELASTIC_IP
 Get the code:
 
 ```bash
-git clone https://github.com/LynnUoE/om-dissertation-implementation.git litfinder && cd litfinder
+git clone https://github.com/LynnUoE/LitFinder.git litfinder && cd litfinder
 ```
 
 Run the one-time setup (swap, Docker, firewall, automatic security updates):

@@ -67,7 +67,10 @@ def make_issue(n: int, pull: bool = False, **fields) -> Dict:
 
 
 class FakeGitHub:
-    """Stands in for GitHubClient; records requests and serves canned responses by path."""
+    """Stands in for GitHubClient; records requests and serves canned responses by path.
+
+    A tuple of responses is served in order, one per request; an exception response is raised.
+    """
 
     def __init__(self, responses: Optional[Dict] = None):
         self.responses = responses or {}
@@ -78,7 +81,12 @@ class FakeGitHub:
         self.calls.append({"path": path, "params": params})
         if path not in self.responses:
             raise ToolError("Not found on GitHub")
-        return self.responses[path]
+        response = self.responses[path]
+        if isinstance(response, tuple):
+            response, self.responses[path] = response[0], response[1:]
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 # -- fake chat completions ---------------------------------------------------

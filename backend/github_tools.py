@@ -50,8 +50,19 @@ class GetGithubIssue(BaseModel):
 # API client
 # ---------------------------------------------------------------------------
 
+class GitHubError(ToolError):
+    """An error response from GitHub; `status` is its HTTP status code."""
+
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.status = status
+
+
 class GitHubClient:
-    """Minimal GitHub REST client; raises ToolError with a message the model can act on."""
+    """Minimal GitHub REST client; raises ToolError with a message the model can act on.
+
+    requests follows redirects, so a renamed repository's old name keeps working, except in search.
+    """
 
     def __init__(self, token: Optional[str] = None, timeout: tuple = (5, 20)):
         self.base_url = "https://api.github.com"
@@ -82,17 +93,20 @@ class GitHubClient:
         if response.status_code in (403, 429) and (
                 response.headers.get("X-RateLimit-Remaining") == "0" or "Retry-After" in response.headers):
             hint = "" if self.authenticated else "; set GITHUB_TOKEN on the server for higher limits"
-            raise ToolError(f"GitHub rate limit reached, try again later{hint}")
+            raise GitHubError(f"GitHub rate limit reached, try again later{hint}", response.status_code)
         if response.status_code == 404:
-            raise ToolError("Not found on GitHub: the repository or number does not exist, or it is private "
-                            "and the server's token cannot read it")
+            raise GitHubError("Not found on GitHub: the repository or number does not exist, or it is private "
+                              "and the server's token cannot read it", 404)
         if response.status_code == 401:
-            raise ToolError("GitHub rejected the server's GITHUB_TOKEN")
+            raise GitHubError("GitHub rejected the server's GITHUB_TOKEN", 401)
         try:
-            message = response.json().get("message", "")
-        except (ValueError, AttributeError):
+            body = response.json()
+            # Validation errors put the useful part in errors[].message, after a generic "Validation Failed"
+            details = [e["message"] for e in body.get("errors") or [] if isinstance(e, dict) and e.get("message")]
+            message = ": ".join([body.get("message", "")] + details)
+        except (ValueError, AttributeError, TypeError):
             message = ""
-        raise ToolError(f"GitHub error (HTTP {response.status_code}): {message[:200]}")
+        raise GitHubError(f"GitHub error (HTTP {response.status_code}): {message[:300]}", response.status_code)
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +116,14 @@ class GitHubClient:
 def _truncate(text: Optional[str], limit: int) -> str:
     text = (text or "").strip()
     return text if len(text) <= limit else text[:limit].rstrip() + f"... [truncated, {len(text)} characters in total]"
+
+
+def _canonical_repo(repository_url: Optional[str]) -> Optional[str]:
+    """'https://api.github.com/repos/owner/name' -> 'owner/name'."""
+    prefix = "https://api.github.com/repos/"
+    if repository_url and repository_url.startswith(prefix) and _REPO.match(repository_url[len(prefix):]):
+        return repository_url[len(prefix):]
+    return None
 
 
 def _login(item: Dict) -> Optional[str]:
@@ -151,19 +173,33 @@ class GitHubTools:
         if not 1 <= params.limit <= MAX_LIMIT:
             raise ToolError(f"limit must be between 1 and {MAX_LIMIT}")
 
+        try:
+            data = self._search(repo, params)
+        except GitHubError as e:
+            if e.status != 422:
+                raise
+            # Search rejects a renamed repository's old name, but the repos API redirects to the new one
+            # (and answers 404 if the repository doesn't exist)
+            canonical = self.client.get(f"/repos/{repo}").get("full_name") or repo
+            if canonical.lower() == repo.lower():
+                raise
+            repo = canonical
+            data = self._search(repo, params)
+        return {
+            "repo": repo,
+            "total_matches": data.get("total_count", 0),
+            "results": [_summary(item) for item in data.get("items") or []],
+        }
+
+    def _search(self, repo: str, params: SearchGithubIssues) -> Dict:
         # The search API covers listing and keyword search, and unlike /issues keeps the two kinds apart
         terms = [f"repo:{repo}", f"is:{params.kind}"]
         if params.state != "all":
             terms.append(f"is:{params.state}")
         if params.query and params.query.strip():
             terms.append(params.query.strip())
-        data = self.client.get("/search/issues", {"q": " ".join(terms), "sort": params.sort,
+        return self.client.get("/search/issues", {"q": " ".join(terms), "sort": params.sort,
                                                   "order": "desc", "per_page": params.limit})
-        return {
-            "repo": repo,
-            "total_matches": data.get("total_count", 0),
-            "results": [_summary(item) for item in data.get("items") or []],
-        }
 
     def get_github_issue(self, params: GetGithubIssue) -> Dict:
         repo = self._repo(params.repo)
@@ -173,6 +209,8 @@ class GitHubTools:
             raise ToolError(f"max_comments must be between 0 and {MAX_COMMENTS}")
 
         item = self.client.get(f"/repos/{repo}/issues/{params.number}")
+        # The current name, if the repository was renamed (the request above followed the redirect)
+        repo = _canonical_repo(item.get("repository_url")) or repo
         result = {"repo": repo, **_summary(item)}
         result["closed_at"] = item.get("closed_at")
         result["body"] = _truncate(item.get("body"), BODY_CHARS)
