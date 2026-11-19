@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-[![CI/CD](https://github.com/LynnUoE/om-dissertation-implementation/actions/workflows/ci.yml/badge.svg)](https://github.com/LynnUoE/om-dissertation-implementation/actions/workflows/ci.yml)
+[![CI/CD](https://github.com/LynnUoE/LitFinder/actions/workflows/ci.yml/badge.svg)](https://github.com/LynnUoE/LitFinder/actions/workflows/ci.yml)
 
 LitFinder 是一个基于大语言模型的学术文献检索系统。用自然语言描述你要找的内容，比如 *"检测 LLM 输出幻觉的方法，特别是基于检索的方法"*，它会在 [OpenAlex](https://openalex.org)（收录 3 亿多篇学术作品的开放目录）中找到相关论文和研究者。
 
@@ -46,8 +46,8 @@ flowchart LR
 需要 Python 3.12+、一个 OpenAI（或兼容 OpenAI 接口的服务）API key。最好再申请一个免费的 [OpenAlex API key](https://openalex.org)，可以避开 OpenAlex 对匿名请求的限流。
 
 ```bash
-git clone https://github.com/LynnUoE/om-dissertation-implementation.git
-cd om-dissertation-implementation
+git clone https://github.com/LynnUoE/LitFinder.git
+cd LitFinder
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp backend/.env.example backend/.env     # 然后填入你的 key
@@ -281,7 +281,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-104 个测试离线运行，不到 1 秒完成，用假的 LLM、OpenAlex 和 reranker 客户端替代真实服务。覆盖范围：
+109 个测试离线运行，不到 1 秒完成，用假的 LLM、OpenAlex 和 reranker 客户端替代真实服务。覆盖范围：
 
 - 检索：语义搜索、关键词检索式融合、重复论文合并、过滤条件、重排、引用先验、引文扩展、各策略的默认配置、OpenAlex 额度用尽和请求超时
 - 评测指标

@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![CI/CD](https://github.com/LynnUoE/om-dissertation-implementation/actions/workflows/ci.yml/badge.svg)](https://github.com/LynnUoE/om-dissertation-implementation/actions/workflows/ci.yml)
+[![CI/CD](https://github.com/LynnUoE/LitFinder/actions/workflows/ci.yml/badge.svg)](https://github.com/LynnUoE/LitFinder/actions/workflows/ci.yml)
 
 LitFinder is an LLM-powered academic literature search system. Describe what you are looking for in plain language, for example *"methods for detecting hallucinations in LLM outputs, especially retrieval-based ones"*, and it finds relevant papers and researchers in [OpenAlex](https://openalex.org), a catalog of 300M+ scholarly works.
 
@@ -46,8 +46,8 @@ flowchart LR
 Requires Python 3.12+, an OpenAI (or OpenAI-compatible) API key, and ideally a free [OpenAlex API key](https://openalex.org), which avoids OpenAlex's anonymous rate limit.
 
 ```bash
-git clone https://github.com/LynnUoE/om-dissertation-implementation.git
-cd om-dissertation-implementation
+git clone https://github.com/LynnUoE/LitFinder.git
+cd LitFinder
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp backend/.env.example backend/.env     # then fill in your keys
@@ -281,7 +281,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-The 104 tests run offline in under a second. Fake LLM, OpenAlex and reranker clients stand in for the real services. The tests cover:
+The 109 tests run offline in under a second. Fake LLM, OpenAlex and reranker clients stand in for the real services. The tests cover:
 
 - retrieval: semantic search, keyword query fusion, duplicate merging, filters, reranking, the citation prior, citation expansion, strategy defaults, OpenAlex budget errors and timeouts
 - the evaluation metrics

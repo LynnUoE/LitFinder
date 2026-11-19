@@ -108,7 +108,7 @@ ssh -i ~/.ssh/litfinder.pem ubuntu@你的ElasticIP
 拉取代码：
 
 ```bash
-git clone https://github.com/LynnUoE/om-dissertation-implementation.git litfinder && cd litfinder
+git clone https://github.com/LynnUoE/LitFinder.git litfinder && cd litfinder
 ```
 
 运行一次性初始化（swap、Docker、防火墙、自动安全更新）：
