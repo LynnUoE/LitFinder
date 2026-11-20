@@ -270,7 +270,7 @@ claude mcp add litfinder -s user -- /absolute/path/to/.venv/bin/python /absolute
 | `GET /api/publication/{id}` | 论文详情和它被引最多的参考文献（OpenAlex ID 或 DOI） |
 | `GET /api/publication/{id}/analyze` | 根据摘要，用 LLM 生成一篇论文的阅读笔记 |
 | `POST /api/process-query` | 只做结构化查询分析，不检索 |
-| `GET /api/health_check` | 健康状态和请求统计 |
+| `GET /api/health_check` | 健康状态、请求统计和用量。同时检查 LLM 服务商是否接受 API key（不产生费用，最多每 5 分钟一次）；不接受时（例如 key 过期）返回 `503` 和 `"status": "unhealthy"` |
 
 出错时返回的 JSON 包含 `status: "error"` 和 `message`。LLM 或 OpenAlex 出错返回 `502`，找不到论文返回 `404`，输入不合法返回 `400` 或 `422`。
 
@@ -281,10 +281,11 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-109 个测试离线运行，不到 1 秒完成，用假的 LLM、OpenAlex 和 reranker 客户端替代真实服务。覆盖范围：
+120 个测试离线运行，不到 1 秒完成，用假的 LLM、OpenAlex 和 reranker 客户端替代真实服务。覆盖范围：
 
 - 检索：语义搜索、关键词检索式融合、重复论文合并、过滤条件、重排、引用先验、引文扩展、各策略的默认配置、OpenAlex 额度用尽和请求超时
 - 评测指标
+- 健康检查中的 API key 检查：缓存、key 被拒绝、无法判断的情况
 - 工具 schema 和参数校验
 - Agent 循环：`tool_call_id` 对应关系、并行调用、编造的 ID、强制最后一步作答、API 出错
 - Structured Outputs 的降级逻辑

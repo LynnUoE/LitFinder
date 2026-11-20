@@ -13,6 +13,7 @@ from openalex_client import create_client
 from research_analyzer import create_analyzer
 from literature_searcher import create_literature_searcher, LiteratureSearcher
 from agent import ResearchAgent
+from health import LLMKeyCheck, create_check_client
 from llm import DEFAULT_LLM_MODEL
 from usage_limits import Limit, UsageLimiter
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -76,6 +77,9 @@ class Config:
     TRUST_PROXY = os.getenv("TRUST_PROXY", "false").lower() == "true"
     # Origins allowed to call the API from a browser; empty = same origin only (the bundled frontend)
     CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+    # /api/health_check asks the LLM provider whether it accepts the key (free, at most every 5 minutes)
+    # and answers 503 if it doesn't. Turn off where the key is a placeholder, e.g. CI's image smoke test.
+    LLM_HEALTH_CHECK = os.getenv("LLM_HEALTH_CHECK", "true").lower() == "true"
 
     @classmethod
     def validate(cls):
@@ -109,6 +113,11 @@ usage_limiter: Optional[UsageLimiter] = UsageLimiter(
     labels={'search': 'searches', 'agent': 'agent searches',
             'analyze': 'paper analyses', 'details': 'paper lookups'},
 ) if Config.USAGE_LIMITS else None
+
+
+llm_key_check: Optional[LLMKeyCheck] = LLMKeyCheck(
+    lambda: create_check_client(Config.LLM_API_KEY, Config.LLM_BASE_URL)
+) if Config.LLM_HEALTH_CHECK and Config.LLM_API_KEY else None
 
 
 @app.before_request
@@ -204,14 +213,17 @@ def static_files(path):
 
 @app.route('/api/health_check')
 def health_check():
-    """Health check endpoint for monitoring"""
+    """Health check endpoint for monitoring: 503 when the LLM provider rejects the API key"""
+    llm = llm_key_check.status() if llm_key_check else {'status': 'not_checked'}
+    healthy = llm['status'] != 'invalid_key'
     return jsonify({
-        'status': 'healthy',
+        'status': 'healthy' if healthy else 'unhealthy',
         'timestamp': datetime.now().isoformat(),
         'version': '1.0.0',
+        'checks': {'llm': llm},
         'stats': request_stats,
         'usage': usage_limiter.usage() if usage_limiter else None
-    })
+    }), 200 if healthy else 503
 
 @app.route('/api/search', methods=['POST'])
 def search_literature():

@@ -145,7 +145,7 @@ deploy/deploy.sh
 
 ## 5. Check it
 
-The health check should report `"status": "healthy"` and today's usage:
+The health check should report `"status": "healthy"`, `"llm": {"status": "ok"}` under `checks`, and today's usage. If the LLM provider rejects the API key (wrong or expired), it answers 503 with `"status": "unhealthy"`, and `deploy/deploy.sh ps` shows the web container as unhealthy:
 
 ```bash
 curl https://YOUR_ADDRESS/api/health_check

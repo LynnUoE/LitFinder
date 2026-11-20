@@ -270,7 +270,7 @@ Both call the same `tools.py` code.
 | `GET /api/publication/{id}` | Publication details and its most-cited references (OpenAlex ID or DOI) |
 | `GET /api/publication/{id}/analyze` | LLM reading notes for a publication, from its abstract |
 | `POST /api/process-query` | Structured query analysis without searching |
-| `GET /api/health_check` | Health and request stats |
+| `GET /api/health_check` | Health, request stats and usage. Also checks that the LLM provider accepts the API key (free, at most every 5 minutes) and answers `503` with `"status": "unhealthy"` if it doesn't, e.g. when the key has expired |
 
 Errors return a JSON body with `status: "error"` and a `message`. LLM or OpenAlex failures return `502`, unknown publications `404`, and invalid input `400` or `422`.
 
@@ -281,10 +281,11 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-The 109 tests run offline in under a second. Fake LLM, OpenAlex and reranker clients stand in for the real services. The tests cover:
+The 120 tests run offline in under a second. Fake LLM, OpenAlex and reranker clients stand in for the real services. The tests cover:
 
 - retrieval: semantic search, keyword query fusion, duplicate merging, filters, reranking, the citation prior, citation expansion, strategy defaults, OpenAlex budget errors and timeouts
 - the evaluation metrics
+- the health check's API key check: caching, rejected keys, inconclusive failures
 - tool schemas and argument validation
 - the agent loop: `tool_call_id` pairing, parallel calls, invented IDs, forced final step, API errors
 - the Structured Outputs fallback
