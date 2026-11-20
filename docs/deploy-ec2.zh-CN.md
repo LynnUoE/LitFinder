@@ -145,7 +145,7 @@ deploy/deploy.sh
 
 ## 5. 检查
 
-健康检查应该返回 `"status": "healthy"` 和当天的用量：
+健康检查应该返回 `"status": "healthy"`、`checks` 下的 `"llm": {"status": "ok"}` 和当天的用量。如果 LLM 服务商不接受 API key（填错或过期），它会返回 503 和 `"status": "unhealthy"`，`deploy/deploy.sh ps` 里 web 容器也会显示 unhealthy：
 
 ```bash
 curl https://你的地址/api/health_check

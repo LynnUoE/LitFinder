@@ -74,4 +74,5 @@ def test_api_returns_429_with_retry_after(monkeypatch):
     assert "1 agent searches per hour" in response.get_json()["message"]
 
     # Free endpoints are never limited
+    monkeypatch.setattr(api_server, "llm_key_check", None)  # Don't contact the LLM provider
     assert api_server.app.test_client().get("/api/health_check").status_code == 200
